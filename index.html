@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body { background-color: #f4f7f9; margin: 0; font-family: sans-serif; }
+        .container { width: 95%; max-width: 1200px; margin: 20px auto; display: flex; flex-direction: column; gap: 20px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; }
+        
+        /* 布局：上方长条折线图，下方两个小仪表盘 */
+        #cnn-gauge { height: 400px; }
+        #vix-gauge { height: 400px; }
+        #cnn-history { height: 400px; }
+        #vix-history { height: 400px; }
+        #spx-history { height: 400px; }
+        .bottom-row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .gauge-card { flex: 1; min-width: 300px; height: 450px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card" id="cnn-gauge"></div>
+    <div class="card" id="vix-gauge"></div>
+
+    <div class="card" id="cnn-history"></div>
+    <div class="card" id="vix-history"></div>
+    <div class="card" id="spx-history"></div>
+</div>
+
+<script type="text/javascript">
+    // --- 绘图函数 ---
+    function updateCnnCharts(cnnData) {
+        // 1. CNN 仪表盘配置
+        const cnnGauge = echarts.init(document.getElementById('cnn-gauge'));
+        cnnGauge.setOption({
+            title: { text: 'CNN Fear & Greed Index - Now', left: 'center' },
+            series: [{
+                type: 'gauge',
+                center: ['50%', '60%'],
+                startAngle: 200, endAngle: -20,
+                min: 0, max: 100,
+                progress: { show: true, width: 12 },
+                axisLine: { lineStyle: { width: 12, color: [[0.25, '#ff4500'], [0.45, '#ffa500'], [0.55, '#ccc'], [0.75, '#90ee90'], [1, '#008000']] } },
+                detail: { valueAnimation: true, offsetCenter: [0, '40%'], fontSize: 30, formatter: '{value}' },
+                data: [{ value: Math.round(cnnData.fear_and_greed.score * 100) / 100, name: cnnData.fear_and_greed.rating.toUpperCase() }]
+            }]
+        });
+        cnnGauge.resize()
+
+        // 2. VIX 仪表盘配置
+        const vixGauge = echarts.init(document.getElementById('vix-gauge'));
+        const vix_value_data_list = cnnData.market_volatility_vix.data
+        const vix_latest_data = vix_value_data_list[vix_value_data_list.length - 1]
+        vixGauge.setOption({
+            title: { text: 'VIX - Now', left: 'center' },
+            series: [{
+                type: 'gauge',
+                center: ['50%', '60%'],
+                startAngle: 200, endAngle: -20,
+                min: 0, max: 100,
+                progress: { show: true, width: 12 },
+                detail: { valueAnimation: true, offsetCenter: [0, '40%'], fontSize: 30, formatter: '{value}' },
+                data: [{ value: Math.round(vix_latest_data.y * 100) / 100, name: vix_latest_data.rating.toUpperCase() }]
+            }]
+        });
+        vixGauge.resize()
+
+        // 3. CNN 历史折线图配置
+        const historyChart = echarts.init(document.getElementById('cnn-history'));
+        historyChart.setOption({
+            title: { text: 'CNN Fear & Greed Index - History Trend', left: 'center' },
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'time' },
+            yAxis: { type: 'value', min: 0, max: 100 },
+            visualMap: {
+                show: false,
+                pieces: [{gt: 0, lte: 25, color: '#ff4500'}, {gt: 25, lte: 45, color: '#ffa500'}, {gt: 45, lte: 55, color: '#ccc'}, {gt: 55, lte: 75, color: '#90ee90'}, {gt: 75, lte: 100, color: '#008000'}]
+            },
+            series: [{ type: 'line', smooth: true, data: cnnData.fear_and_greed_historical.data.map(d => [d.x, d.y]), areaStyle: {opacity: 0.1} }]
+        });
+        historyChart.resize()
+
+        // 4. VIX 历史折线图
+        const historyVixChart = echarts.init(document.getElementById('vix-history'));
+        historyVixChart.setOption({
+            title: { text: 'VIX - History Trend', left: 'center' },
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'time' },
+            yAxis: { type: 'value', min: 0, max: 50 },
+            series: [{ type: 'line', smooth: true, data: cnnData.market_volatility_vix.data.map(d => [d.x, d.y]), areaStyle: {opacity: 0.1} }]
+        });
+        historyVixChart.resize() 
+
+        // 5. SPX 历史折线图
+        const historySpxChart = echarts.init(document.getElementById('spx-history'));
+        historySpxChart.setOption({
+            title: { text: 'S&P 500 Index - History Trend', left: 'center' },
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'time' },
+            yAxis: { 
+                type: 'value',
+                scale: true,
+                min: function(value) { return value.min * 0.99; },
+                max: function(value) { return value.max * 1.01; },
+            },
+            series: [{ type: 'line', smooth: true, data: cnnData.market_momentum_sp500.data.map(d => [d.x, d.y]) }]
+        });
+        historySpxChart.resize()
+    }
+
+    async function fetchData() {
+        // 检查参数，失败则退出
+        window.onload = function() {
+            // 获取URL中的查询参数
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // 检查是否有GET参数 ?purpose=.NDX&providers=CNN
+            if (!urlParams.toString() || urlParams.get('purpose') !== '.NDX' || urlParams.get('providers') !== 'CNN') {
+                const container = document.querySelector('.container');
+                container.innerHTML = '';
+                const heading = document.createElement('h1');
+                heading.textContent = 'Hello World';
+                container.appendChild(heading);
+            }
+        };
+
+        const cnnGauge = document.querySelector('.cnn-gauge');
+        if (cnnGauge) {
+            fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata')
+                .then(r => r.json())
+                .then(data => {
+                    updateCnnCharts(data);
+                })
+                .catch((e) => {
+                    console.log(e)
+                    alert("数据获取失败");
+                });
+        }
+
+    }
+    fetchData();
+</script>
+
+</body>
+</html>
