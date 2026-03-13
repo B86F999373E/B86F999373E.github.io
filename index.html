@@ -111,37 +111,33 @@
         historySpxChart.resize()
     }
 
+    // 检查参数，失败则退出
+    window.onload = function() {
+        // 获取URL中的查询参数
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 检查是否有GET参数 ?purpose=.NDX&providers=CNN
+        if (!urlParams.toString() || urlParams.get('purpose') !== '.NDX' || urlParams.get('providers') !== 'CNN') {
+            const container = document.querySelector('.container');
+            container.innerHTML = '';
+            const heading = document.createElement('h1');
+            heading.textContent = 'Hello World';
+            container.appendChild(heading);
+            return; // 阻止 fetch
+        }    
+        fetchData();
+    };
+
     async function fetchData() {
-        // 检查参数，失败则退出
-        window.onload = function() {
-            // 获取URL中的查询参数
-            const urlParams = new URLSearchParams(window.location.search);
-            
-            // 检查是否有GET参数 ?purpose=.NDX&providers=CNN
-            if (!urlParams.toString() || urlParams.get('purpose') !== '.NDX' || urlParams.get('providers') !== 'CNN') {
-                const container = document.querySelector('.container');
-                container.innerHTML = '';
-                const heading = document.createElement('h1');
-                heading.textContent = 'Hello World';
-                container.appendChild(heading);
-            }
-        };
-
-        const cnnGauge = document.querySelector('.cnn-gauge');
-        if (cnnGauge) {
-            fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata')
-                .then(r => r.json())
-                .then(data => {
-                    updateCnnCharts(data);
-                })
-                .catch((e) => {
-                    console.log(e)
-                    alert("数据获取失败");
-                });
+        try {
+            const res = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata');
+            const data = await res.json();
+            updateCnnCharts(data);
+        } catch (e) {
+            console.error(e);
+            alert("数据获取失败");
         }
-
     }
-    fetchData();
 </script>
 
 </body>
