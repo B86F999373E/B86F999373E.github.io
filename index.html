@@ -42,9 +42,19 @@
                 center: ['50%', '60%'],
                 startAngle: 200, endAngle: -20,
                 min: 0, max: 100,
-                progress: { show: true, width: 12 },
-                axisLine: { lineStyle: { width: 12, color: [[0.25, '#ff4500'], [0.45, '#ffa500'], [0.55, '#ccc'], [0.75, '#90ee90'], [1, '#008000']] } },
-                detail: { valueAnimation: true, offsetCenter: [0, '40%'], fontSize: 30, formatter: '{value}' },
+                axisLine: { 
+                    lineStyle: { 
+                        width: 12, 
+                        color: [
+                            [0.25, '#ff4500'], // 0-25 极度恐惧
+                            [0.45, '#ffa500'], // 25-45 恐惧
+                            [0.55, '#ccc'],    // 45-55 中性
+                            [0.75, '#90ee90'], // 55-75 贪婪
+                            [1.00, '#008000']  // 75-100 极度贪婪
+                        ] 
+                    }
+                },
+                detail: { valueAnimation: false, offsetCenter: [0, '40%'], fontSize: 30, formatter: '{value}' },
                 data: [{ value: Math.round(cnnData.fear_and_greed.score * 100) / 100, name: cnnData.fear_and_greed.rating.toUpperCase() }]
             }]
         });
@@ -54,16 +64,38 @@
         const vixGauge = echarts.init(document.getElementById('vix-gauge'));
         const vix_value_data_list = cnnData.market_volatility_vix.data
         const vix_latest_data = vix_value_data_list[vix_value_data_list.length - 1]
+
+        const vixRealValue = vix_latest_data.y;           // 实际VIX值可以超过60
+        const vixGaugeValue = Math.min(60, vixRealValue); // 指针最大60，之后饱和在60不输出
         vixGauge.setOption({
             title: { text: 'VIX - Now', left: 'center' },
             series: [{
                 type: 'gauge',
                 center: ['50%', '60%'],
                 startAngle: 200, endAngle: -20,
-                min: 0, max: 100,
-                progress: { show: true, width: 12 },
-                detail: { valueAnimation: true, offsetCenter: [0, '40%'], fontSize: 30, formatter: '{value}' },
-                data: [{ value: Math.round(vix_latest_data.y * 100) / 100, name: vix_latest_data.rating.toUpperCase() }]
+                min: 0, max: 60,
+                axisLine: {
+                    lineStyle: { 
+                        width: 12, 
+                        color: [
+                            [10 / 60, '#008000'],    // 00 - 10：极度平静，市场情绪非常乐观（较少出现），
+                            [15 / 60, '#90ee90'],    // 10 – 15：低波动，牛市或稳定上涨环境常见
+                            [20 / 60, '#ccc'],       // 15 – 20：正常波动区间（长期平均大约在这里）
+                            [30 / 60, '#ffa500'],    // 20 – 30：市场开始紧张，风险上升
+                            [40 / 60, '#ff4500'],    // 30 – 40：明显恐慌，通常伴随较大回调
+                            [60 / 60, '#000000'],    // 40 – 60：极端恐慌，60以上饱和为黑色
+                        ]
+                    }
+                },
+                detail: {
+                    valueAnimation: false,
+                    offsetCenter: [0, '40%'],
+                    fontSize: 30,
+                    ormatter: function () {
+                        return vixRealValue.toFixed(2);
+                    }
+                },
+                data: [{ value: vixGaugeValue.toFixed(2), name: (vix_latest_data.rating || '').toUpperCase() }]
             }]
         });
         vixGauge.resize()
@@ -79,7 +111,14 @@
                 show: false,
                 pieces: [{gt: 0, lte: 25, color: '#ff4500'}, {gt: 25, lte: 45, color: '#ffa500'}, {gt: 45, lte: 55, color: '#ccc'}, {gt: 55, lte: 75, color: '#90ee90'}, {gt: 75, lte: 100, color: '#008000'}]
             },
-            series: [{ type: 'line', smooth: true, data: cnnData.fear_and_greed_historical.data.map(d => [d.x, d.y]), areaStyle: {opacity: 0.1} }]
+            series: [
+                {
+                    type: 'line',
+                    smooth: true,
+                    data: cnnData.fear_and_greed_historical.data.map(d => [d.x, d.y]),
+                    areaStyle: {opacity: 0.1},
+                    lineStyle: { width: 5 }
+                }]
         });
         historyChart.resize()
 
@@ -89,8 +128,38 @@
             title: { text: 'VIX - History Trend', left: 'center' },
             tooltip: { trigger: 'axis' },
             xAxis: { type: 'time' },
-            yAxis: { type: 'value', min: 0, max: 50 },
-            series: [{ type: 'line', smooth: true, data: cnnData.market_volatility_vix.data.map(d => [d.x, d.y]), areaStyle: {opacity: 0.1} }]
+            yAxis: {
+                type: 'value',
+                min: 0,
+                max: function(value) {
+                    return value.max;
+                },
+            },
+            visualMap: {
+                show: false,
+                dimension: 1, // 绑定到 y 轴
+                pieces: [
+                    {gt: 0,  lte: 10, color: '#008000'}, // 0-10 极度平静
+                    {gt: 10, lte: 15, color: '#90ee90'}, // 10-15 低波动
+                    {gt: 15, lte: 20, color: '#ccc'},    // 15-20 正常区间
+                    {gt: 20, lte: 30, color: '#ffa500'}, // 20-30 市场紧张
+                    {gt: 30, lte: 40, color: '#ff4500'}, // 30-40 明显恐慌
+                    {gt: 40, color: '#000000'}           // 40以上 极端恐慌
+                ]
+            },
+            series: [
+                {
+                    type: 'line',
+                    smooth: true,
+                    data: cnnData.market_volatility_vix.data.map(d => [d.x, d.y]),
+                    lineStyle: {
+                        width: 5
+                    },
+                    areaStyle: {
+                        opacity: 0.1
+                    }
+                }
+            ]
         });
         historyVixChart.resize() 
 
@@ -121,7 +190,7 @@
             const container = document.querySelector('.container');
             container.innerHTML = '';
             const heading = document.createElement('h1');
-            heading.textContent = 'Hello World';
+            heading.textContent = 'test';
             container.appendChild(heading);
             return; // 阻止 fetch
         }    
@@ -132,6 +201,7 @@
         try {
             const res = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata');
             const data = await res.json();
+            console.log(data)
             updateCnnCharts(data);
         } catch (e) {
             console.error(e);
