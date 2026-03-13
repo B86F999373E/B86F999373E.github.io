@@ -106,7 +106,12 @@
             title: { text: 'CNN Fear & Greed Index - History Trend', left: 'center' },
             tooltip: { trigger: 'axis' },
             xAxis: { type: 'time' },
-            yAxis: { type: 'value', min: 0, max: 100 },
+            yAxis: {
+                type: 'value',
+                scale: true,
+                min: function(value) { return value.min; },
+                max: function(value) { return value.max; },
+            },
             visualMap: {
                 show: false,
                 pieces: [{gt: 0, lte: 25, color: '#ff4500'}, {gt: 25, lte: 45, color: '#ffa500'}, {gt: 45, lte: 55, color: '#ccc'}, {gt: 55, lte: 75, color: '#90ee90'}, {gt: 75, lte: 100, color: '#008000'}]
@@ -130,10 +135,9 @@
             xAxis: { type: 'time' },
             yAxis: {
                 type: 'value',
-                min: 0,
-                max: function(value) {
-                    return value.max;
-                },
+                scale: true,
+                min: function(value) { return value.min; },
+                max: function(value) { return value.max; },
             },
             visualMap: {
                 show: false,
@@ -169,11 +173,11 @@
             title: { text: 'S&P 500 Index - History Trend', left: 'center' },
             tooltip: { trigger: 'axis' },
             xAxis: { type: 'time' },
-            yAxis: { 
+            yAxis: {
                 type: 'value',
                 scale: true,
-                min: function(value) { return value.min * 0.99; },
-                max: function(value) { return value.max * 1.01; },
+                min: function(value) { return value.min; },
+                max: function(value) { return value.max; },
             },
             series: [{ type: 'line', smooth: true, data: cnnData.market_momentum_sp500.data.map(d => [d.x, d.y]) }]
         });
